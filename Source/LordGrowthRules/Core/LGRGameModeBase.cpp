@@ -17,7 +17,6 @@ void ALGRGameModeBase::BeginPlay()
 	CurrentPhase = ELGRGamePhase::Building;
 	TotalPopulation = FMath::Max(0, InitialPopulation);
 	AssignedPopulation = 0;
-	RecoveringPopulation = 0;
 	OnDayChanged.Broadcast(CurrentDay);
 	OnGamePhaseChanged.Broadcast(CurrentPhase, CurrentPhase);
 	BroadcastPopulationChanged();
@@ -25,7 +24,7 @@ void ALGRGameModeBase::BeginPlay()
 
 int32 ALGRGameModeBase::GetAvailablePopulation() const
 {
-	return FMath::Max(0, TotalPopulation - AssignedPopulation - RecoveringPopulation);
+	return FMath::Max(0, TotalPopulation - AssignedPopulation);
 }
 
 bool ALGRGameModeBase::CanAffordPopulation(const int32 PopulationCost) const
@@ -57,15 +56,17 @@ bool ALGRGameModeBase::RefundAssignedPopulation(const int32 PopulationAmount)
 	return true;
 }
 
-bool ALGRGameModeBase::MoveAssignedPopulationToRecovery(const int32 PopulationAmount)
+bool ALGRGameModeBase::LoseAssignedPopulation(const int32 PopulationAmount)
 {
-	if (PopulationAmount < 0 || PopulationAmount > AssignedPopulation)
+	if (PopulationAmount < 0
+		|| PopulationAmount > AssignedPopulation
+		|| PopulationAmount > TotalPopulation)
 	{
 		return false;
 	}
 
 	AssignedPopulation -= PopulationAmount;
-	RecoveringPopulation += PopulationAmount;
+	TotalPopulation -= PopulationAmount;
 	BroadcastPopulationChanged();
 	return true;
 }
@@ -78,17 +79,6 @@ void ALGRGameModeBase::AddPopulation(const int32 PopulationAmount)
 	}
 
 	TotalPopulation += PopulationAmount;
-	BroadcastPopulationChanged();
-}
-
-void ALGRGameModeBase::RecoverAllPopulation()
-{
-	if (RecoveringPopulation <= 0)
-	{
-		return;
-	}
-
-	RecoveringPopulation = 0;
 	BroadcastPopulationChanged();
 }
 
@@ -164,7 +154,6 @@ void ALGRGameModeBase::SetPhase(const ELGRGamePhase NewPhase)
 
 void ALGRGameModeBase::AdvanceToNextDay()
 {
-	RecoverAllPopulation();
 	++CurrentDay;
 	OnDayChanged.Broadcast(CurrentDay);
 	SetPhase(ELGRGamePhase::Building);
@@ -175,6 +164,5 @@ void ALGRGameModeBase::BroadcastPopulationChanged()
 	OnPopulationChanged.Broadcast(
 		TotalPopulation,
 		AssignedPopulation,
-		RecoveringPopulation,
 		GetAvailablePopulation());
 }

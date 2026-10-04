@@ -74,7 +74,7 @@ float ALGRBuildingBase::ApplyBuildingDamage(const float DamageAmount, AActor* Da
 				}
 				else if (bPlacedOnGrid && PopulationCost > 0)
 				{
-					GameMode->MoveAssignedPopulationToRecovery(PopulationCost);
+					GameMode->LoseAssignedPopulation(PopulationCost);
 				}
 			}
 		}

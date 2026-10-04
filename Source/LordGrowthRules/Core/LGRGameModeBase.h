@@ -18,14 +18,12 @@ enum class ELGRGamePhase : uint8
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FLGRGamePhaseChangedSignature, ELGRGamePhase, PreviousPhase, ELGRGamePhase, NewPhase);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FLGRDayChangedSignature, int32, NewDay);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FLGRGameOverSignature, bool, bPlayerWon);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
 	FLGRPopulationChangedSignature,
 	int32,
 	TotalPopulation,
 	int32,
 	AssignedPopulation,
-	int32,
-	RecoveringPopulation,
 	int32,
 	AvailablePopulation);
 
@@ -71,9 +69,6 @@ public:
 	int32 GetAssignedPopulation() const { return AssignedPopulation; }
 
 	UFUNCTION(BlueprintPure, Category = "LGR|Population")
-	int32 GetRecoveringPopulation() const { return RecoveringPopulation; }
-
-	UFUNCTION(BlueprintPure, Category = "LGR|Population")
 	int32 GetAvailablePopulation() const;
 
 	UFUNCTION(BlueprintPure, Category = "LGR|Population")
@@ -85,14 +80,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "LGR|Population")
 	bool RefundAssignedPopulation(int32 PopulationAmount);
 
+	// Removes occupants of a destroyed building from both assigned and total population.
 	UFUNCTION(BlueprintCallable, Category = "LGR|Population")
-	bool MoveAssignedPopulationToRecovery(int32 PopulationAmount);
+	bool LoseAssignedPopulation(int32 PopulationAmount);
 
 	UFUNCTION(BlueprintCallable, Category = "LGR|Population")
 	void AddPopulation(int32 PopulationAmount);
-
-	UFUNCTION(BlueprintCallable, Category = "LGR|Population")
-	void RecoverAllPopulation();
 
 	UPROPERTY(BlueprintAssignable, Category = "LGR|Game Flow")
 	FLGRGamePhaseChangedSignature OnGamePhaseChanged;
@@ -132,9 +125,6 @@ protected:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "LGR|Population")
 	int32 AssignedPopulation = 0;
-
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "LGR|Population")
-	int32 RecoveringPopulation = 0;
 
 private:
 	void SetPhase(ELGRGamePhase NewPhase);

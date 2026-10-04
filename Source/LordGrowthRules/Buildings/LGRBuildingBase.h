@@ -89,9 +89,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Building")
 	ELGRBuildingType BuildingType = ELGRBuildingType::Residence;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Building", meta = (ClampMin = "1"))
-	int32 BuildingLevel = 1;
-
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Building")
 	FIntPoint FootprintSize = FIntPoint(1, 1);
 
