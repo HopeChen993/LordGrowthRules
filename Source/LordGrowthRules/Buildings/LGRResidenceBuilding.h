@@ -28,7 +28,7 @@ public:
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Residence", meta = (ClampMin = "0"))
-	int32 BasePopulationGain = 1;
+	int32 BasePopulationGain = 3;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Residence", meta = (ClampMin = "0"))
 	int32 NoiseTolerance = 0;

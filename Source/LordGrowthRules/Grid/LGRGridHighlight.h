@@ -6,6 +6,7 @@
 
 class UMaterialInterface;
 class USceneComponent;
+class UStaticMesh;
 class UStaticMeshComponent;
 
 UCLASS(BlueprintType, Blueprintable)
@@ -23,6 +24,12 @@ public:
 	void SetFootprintSize(float InCellSize, FIntPoint InFootprintSize);
 
 	UFUNCTION(BlueprintCallable, Category = "LGR|Grid Highlight")
+	void SetCircleRadius(float InCellSize, float RadiusInCells);
+
+	UFUNCTION(BlueprintCallable, Category = "LGR|Grid Highlight")
+	void SetCellCoverage(float InCellCoverage);
+
+	UFUNCTION(BlueprintCallable, Category = "LGR|Grid Highlight")
 	void ShowHighlight(const FVector& WorldLocation, bool bCanPlace);
 
 	UFUNCTION(BlueprintCallable, Category = "LGR|Grid Highlight")
@@ -35,6 +42,12 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LGR|Grid Highlight")
 	TObjectPtr<UStaticMeshComponent> HighlightMesh;
 
+	UPROPERTY()
+	TObjectPtr<UStaticMesh> PlaneMesh;
+
+	UPROPERTY()
+	TObjectPtr<UStaticMesh> CircleMesh;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Grid Highlight")
 	TObjectPtr<UMaterialInterface> AvailableMaterial;
 
@@ -46,6 +59,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Grid Highlight", meta = (ClampMin = "0.1", ClampMax = "1.0"))
 	float CellCoverage = 0.94f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Grid Highlight", meta = (ClampMin = "0.1"))
+	float CircleThickness = 4.0f;
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "LGR|Grid Highlight")
 	void OnPlacementStateChanged(bool bCanPlace);

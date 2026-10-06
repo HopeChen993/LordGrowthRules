@@ -21,13 +21,21 @@ public:
 	UFUNCTION(BlueprintPure, Category = "LGR|Garden")
 	int32 GetResidencePopulationBonus() const { return ResidencePopulationBonus; }
 
+	UFUNCTION(BlueprintPure, Category = "LGR|Garden|Pollution")
+	bool IsDisabledByPollution() const { return bDisabledByPollution; }
+
+	void SetDisabledByPollution(bool bNewDisabled) { bDisabledByPollution = bNewDisabled; }
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Garden", meta = (ClampMin = "0"))
 	int32 EffectRadius = 1;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Garden", meta = (ClampMin = "0"))
-	int32 NoiseReduction = 2;
+	int32 NoiseReduction = 3;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Garden", meta = (ClampMin = "0"))
-	int32 ResidencePopulationBonus = 1;
+	int32 ResidencePopulationBonus = 0;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "LGR|Garden|Pollution")
+	bool bDisabledByPollution = false;
 };

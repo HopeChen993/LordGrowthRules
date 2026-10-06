@@ -1,6 +1,7 @@
 #include "LGRBuildingSettlementComponent.h"
 
 #include "../Buildings/LGRArrowTowerBuilding.h"
+#include "../Buildings/LGRBlacksmithBuilding.h"
 #include "../Buildings/LGRGardenBuilding.h"
 #include "../Buildings/LGRResidenceBuilding.h"
 #include "../Core/LGRGameModeBase.h"
@@ -23,6 +24,7 @@ bool ULGRBuildingSettlementComponent::ResolveDailyBuildingRules()
 	TArray<ALGRResidenceBuilding*> Residences;
 	TArray<ALGRArrowTowerBuilding*> ArrowTowers;
 	TArray<ALGRGardenBuilding*> Gardens;
+	TArray<ALGRBlacksmithBuilding*> Blacksmiths;
 
 	for (TActorIterator<ALGRResidenceBuilding> It(World); It; ++It)
 	{
@@ -48,6 +50,28 @@ bool ULGRBuildingSettlementComponent::ResolveDailyBuildingRules()
 		}
 	}
 
+	for (TActorIterator<ALGRBlacksmithBuilding> It(World); It; ++It)
+	{
+		if (IsValid(*It) && It->IsPlacedOnGrid() && It->GetCurrentHealth() > 0.0f)
+		{
+			Blacksmiths.Add(*It);
+		}
+	}
+
+	for (ALGRGardenBuilding* Garden : Gardens)
+	{
+		bool bDisabledByPollution = false;
+		for (const ALGRBlacksmithBuilding* Blacksmith : Blacksmiths)
+		{
+			if (Blacksmith->IsGridPositionInEffectRange(Garden->GetGridOrigin()))
+			{
+				bDisabledByPollution = true;
+				break;
+			}
+		}
+		Garden->SetDisabledByPollution(bDisabledByPollution);
+	}
+
 	int32 TotalPopulationGain = 0;
 	for (ALGRResidenceBuilding* Residence : Residences)
 	{
@@ -58,7 +82,7 @@ bool ULGRBuildingSettlementComponent::ResolveDailyBuildingRules()
 
 		for (const ALGRArrowTowerBuilding* ArrowTower : ArrowTowers)
 		{
-			const int32 Distance = GetGridDistance(ResidenceOrigin, ArrowTower->GetGridOrigin());
+			const int32 Distance = GetSquareGridDistance(ResidenceOrigin, ArrowTower->GetGridOrigin());
 			if (Distance <= ArrowTower->GetNoiseRadius())
 			{
 				const int32 FalloffDistance = FMath::Max(0, Distance - 1);
@@ -70,9 +94,22 @@ bool ULGRBuildingSettlementComponent::ResolveDailyBuildingRules()
 			}
 		}
 
+		for (const ALGRBlacksmithBuilding* Blacksmith : Blacksmiths)
+		{
+			if (Blacksmith->IsGridPositionInEffectRange(ResidenceOrigin))
+			{
+				TotalNoise += Blacksmith->GetNoiseStrength();
+			}
+		}
+
 		for (const ALGRGardenBuilding* Garden : Gardens)
 		{
-			const int32 Distance = GetGridDistance(ResidenceOrigin, Garden->GetGridOrigin());
+			if (Garden->IsDisabledByPollution())
+			{
+				continue;
+			}
+
+			const int32 Distance = GetSquareGridDistance(ResidenceOrigin, Garden->GetGridOrigin());
 			if (Distance <= Garden->GetEffectRadius())
 			{
 				TotalNoiseReduction += Garden->GetNoiseReduction();
@@ -99,9 +136,9 @@ bool ULGRBuildingSettlementComponent::ResolveDailyBuildingRules()
 	return true;
 }
 
-int32 ULGRBuildingSettlementComponent::GetGridDistance(
+int32 ULGRBuildingSettlementComponent::GetSquareGridDistance(
 	const FIntPoint& A,
 	const FIntPoint& B)
 {
-	return FMath::Abs(A.X - B.X) + FMath::Abs(A.Y - B.Y);
+	return FMath::Max(FMath::Abs(A.X - B.X), FMath::Abs(A.Y - B.Y));
 }

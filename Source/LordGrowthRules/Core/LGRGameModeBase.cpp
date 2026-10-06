@@ -17,6 +17,7 @@ void ALGRGameModeBase::BeginPlay()
 	CurrentPhase = ELGRGamePhase::Building;
 	TotalPopulation = FMath::Max(0, InitialPopulation);
 	AssignedPopulation = 0;
+	ResetBuildActionsForNewDay();
 	OnDayChanged.Broadcast(CurrentDay);
 	OnGamePhaseChanged.Broadcast(CurrentPhase, CurrentPhase);
 	BroadcastPopulationChanged();
@@ -25,6 +26,11 @@ void ALGRGameModeBase::BeginPlay()
 int32 ALGRGameModeBase::GetAvailablePopulation() const
 {
 	return FMath::Max(0, TotalPopulation - AssignedPopulation);
+}
+
+bool ALGRGameModeBase::HasReachedVictoryPopulation() const
+{
+	return TotalPopulation >= FMath::Max(1, VictoryPopulationTarget);
 }
 
 bool ALGRGameModeBase::CanAffordPopulation(const int32 PopulationCost) const
@@ -82,6 +88,29 @@ void ALGRGameModeBase::AddPopulation(const int32 PopulationAmount)
 	BroadcastPopulationChanged();
 }
 
+bool ALGRGameModeBase::TryConsumeBuildAction()
+{
+	if (CurrentPhase != ELGRGamePhase::Building || RemainingBuildActions <= 0)
+	{
+		return false;
+	}
+
+	--RemainingBuildActions;
+	BroadcastBuildActionsChanged();
+	return true;
+}
+
+void ALGRGameModeBase::RefundBuildAction()
+{
+	if (RemainingBuildActions >= MaxBuildActionsThisDay)
+	{
+		return;
+	}
+
+	++RemainingBuildActions;
+	BroadcastBuildActionsChanged();
+}
+
 bool ALGRGameModeBase::RequestEndBuildingPhase()
 {
 	if (CurrentPhase != ELGRGamePhase::Building)
@@ -103,6 +132,12 @@ bool ALGRGameModeBase::CompleteDayResolution()
 	if (IsValid(BuildingSettlementComponent))
 	{
 		BuildingSettlementComponent->ResolveDailyBuildingRules();
+	}
+
+	if (HasReachedVictoryPopulation())
+	{
+		EndGame(true);
+		return true;
 	}
 
 	if (CurrentDay % FMath::Max(1, DaysPerWave) == 0)
@@ -155,8 +190,22 @@ void ALGRGameModeBase::SetPhase(const ELGRGamePhase NewPhase)
 void ALGRGameModeBase::AdvanceToNextDay()
 {
 	++CurrentDay;
-	OnDayChanged.Broadcast(CurrentDay);
 	SetPhase(ELGRGamePhase::Building);
+	ResetBuildActionsForNewDay();
+	OnDayChanged.Broadcast(CurrentDay);
+}
+
+void ALGRGameModeBase::ResetBuildActionsForNewDay()
+{
+	const int32 SafePopulationPerAction = FMath::Max(1, PopulationPerBuildAction);
+	MaxBuildActionsThisDay = GetAvailablePopulation() / SafePopulationPerAction;
+	RemainingBuildActions = MaxBuildActionsThisDay;
+	BroadcastBuildActionsChanged();
+}
+
+void ALGRGameModeBase::BroadcastBuildActionsChanged()
+{
+	OnBuildActionsChanged.Broadcast(RemainingBuildActions, MaxBuildActionsThisDay);
 }
 
 void ALGRGameModeBase::BroadcastPopulationChanged()

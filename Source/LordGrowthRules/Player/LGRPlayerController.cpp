@@ -1,6 +1,9 @@
 #include "LGRPlayerController.h"
 
+#include "../Buildings/LGRArrowTowerBuilding.h"
+#include "../Buildings/LGRBlacksmithBuilding.h"
 #include "../Buildings/LGRBuildingBase.h"
+#include "../Buildings/LGRGardenBuilding.h"
 #include "../Core/LGRGameModeBase.h"
 #include "../Grid/LGRGridHighlight.h"
 #include "../Grid/LGRGridManager.h"
@@ -24,6 +27,7 @@ void ALGRPlayerController::BeginPlay()
 		SelectedBuildingClass = nullptr;
 		RefreshGridManager();
 		EnsureGridHighlight();
+		EnsureRangeHighlights();
 	}
 }
 
@@ -33,6 +37,16 @@ void ALGRPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		GridHighlight->Destroy();
 		GridHighlight = nullptr;
+	}
+	if (IsValid(PrimaryRangeHighlight))
+	{
+		PrimaryRangeHighlight->Destroy();
+		PrimaryRangeHighlight = nullptr;
+	}
+	if (IsValid(SecondaryRangeHighlight))
+	{
+		SecondaryRangeHighlight->Destroy();
+		SecondaryRangeHighlight = nullptr;
 	}
 
 	Super::EndPlay(EndPlayReason);
@@ -44,6 +58,10 @@ void ALGRPlayerController::PlayerTick(const float DeltaTime)
 
 	if (IsLocalController())
 	{
+		if (SelectedPlacedBuilding && !IsValid(SelectedPlacedBuilding))
+		{
+			ClearPlacedBuildingSelection();
+		}
 		UpdateGridHover();
 	}
 }
@@ -81,18 +99,30 @@ bool ALGRPlayerController::GetHoveredGridCell(FIntPoint& OutGridCoordinates, boo
 
 bool ALGRPlayerController::SelectHoveredGridCell()
 {
+	FHitResult CursorHit;
+	if (GetMouseGroundHit(CursorHit))
+	{
+		if (ALGRBuildingBase* HitBuilding = Cast<ALGRBuildingBase>(CursorHit.GetActor()))
+		{
+			return SelectPlacedBuilding(HitBuilding);
+		}
+	}
+
 	if (!bHasHoveredGridCell || (!IsValid(GridManager) && !RefreshGridManager()))
 	{
+		ClearPlacedBuildingSelection();
 		ClearSelectedGridCell();
 		return false;
 	}
 
 	if (!GridManager->IsCellFree(HoveredGridCoordinates))
 	{
+		ClearPlacedBuildingSelection();
 		ClearSelectedGridCell();
 		return false;
 	}
 
+	ClearPlacedBuildingSelection();
 	SelectedGridCoordinates = HoveredGridCoordinates;
 	bHasSelectedGridCell = true;
 	SelectedBuildingClass = nullptr;
@@ -119,6 +149,43 @@ bool ALGRPlayerController::GetSelectedGridCell(FIntPoint& OutGridCoordinates) co
 {
 	OutGridCoordinates = SelectedGridCoordinates;
 	return bHasSelectedGridCell;
+}
+
+bool ALGRPlayerController::SelectPlacedBuilding(ALGRBuildingBase* Building)
+{
+	if (!IsValid(Building) || !Building->IsPlacedOnGrid() || Building->GetCurrentHealth() <= 0.0f)
+	{
+		ClearPlacedBuildingSelection();
+		return false;
+	}
+
+	if (bHasSelectedGridCell)
+	{
+		const FIntPoint PreviousSelection = SelectedGridCoordinates;
+		bHasSelectedGridCell = false;
+		SelectedBuildingClass = nullptr;
+		OnGridCellSelectionChanged.Broadcast(PreviousSelection, false);
+	}
+
+	SelectedPlacedBuilding = Building;
+	UpdatePlacementHighlight();
+	UpdateSelectedBuildingRanges();
+	OnPlacedBuildingSelectionChanged.Broadcast(SelectedPlacedBuilding);
+	return true;
+}
+
+void ALGRPlayerController::ClearPlacedBuildingSelection()
+{
+	if (!SelectedPlacedBuilding)
+	{
+		HideRangeHighlights();
+		return;
+	}
+
+	SelectedPlacedBuilding = nullptr;
+	HideRangeHighlights();
+	OnPlacedBuildingSelectionChanged.Broadcast(nullptr);
+	UpdatePlacementHighlight();
 }
 
 void ALGRPlayerController::SelectBuildingClass(const TSubclassOf<ALGRBuildingBase> BuildingClass)
@@ -210,8 +277,14 @@ bool ALGRPlayerController::TryPlaceBuildingAt(
 
 	const FIntPoint FootprintSize = BuildingDefaults->GetFootprintSize();
 	const int32 PopulationCost = BuildingDefaults->GetPopulationCost();
+	if (!GameMode->TryConsumeBuildAction())
+	{
+		return false;
+	}
+
 	if (!GameMode->TryAssignPopulation(PopulationCost))
 	{
+		GameMode->RefundBuildAction();
 		return false;
 	}
 
@@ -231,6 +304,7 @@ bool ALGRPlayerController::TryPlaceBuildingAt(
 	if (!IsValid(NewBuilding))
 	{
 		GameMode->RefundAssignedPopulation(PopulationCost);
+		GameMode->RefundBuildAction();
 		return false;
 	}
 
@@ -238,6 +312,7 @@ bool ALGRPlayerController::TryPlaceBuildingAt(
 	{
 		NewBuilding->Destroy();
 		GameMode->RefundAssignedPopulation(PopulationCost);
+		GameMode->RefundBuildAction();
 		return false;
 	}
 
@@ -279,6 +354,11 @@ ELGRPlacementFailureReason ALGRPlayerController::GetPlacementFailureReasonAt(
 		return ELGRPlacementFailureReason::NotBuildingPhase;
 	}
 
+	if (!GameMode->HasRemainingBuildActions())
+	{
+		return ELGRPlacementFailureReason::NoBuildActionsRemaining;
+	}
+
 	if (!GridManager->CanOccupyArea(GridCoordinates, BuildingDefaults->GetFootprintSize()))
 	{
 		return ELGRPlacementFailureReason::CellUnavailable;
@@ -315,8 +395,45 @@ FText ALGRPlayerController::GetPlacementFailureText(
 		return NSLOCTEXT("LGRPlacement", "InsufficientPopulation", "空闲人口不足");
 	case ELGRPlacementFailureReason::SpawnFailed:
 		return NSLOCTEXT("LGRPlacement", "SpawnFailed", "建筑生成失败");
+	case ELGRPlacementFailureReason::NoBuildActionsRemaining:
+		return NSLOCTEXT("LGRPlacement", "NoBuildActionsRemaining", "今日建造次数已用完");
 	default:
 		return NSLOCTEXT("LGRPlacement", "UnknownFailure", "无法建造");
+	}
+}
+
+void ALGRPlayerController::EnsureRangeHighlights()
+{
+	if (!IsValid(GetWorld()))
+	{
+		return;
+	}
+
+	auto SpawnRangeHighlight = [this]() -> ALGRGridHighlight*
+	{
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.Owner = this;
+		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ALGRGridHighlight* Highlight = GetWorld()->SpawnActor<ALGRGridHighlight>(
+			ALGRGridHighlight::StaticClass(),
+			FVector::ZeroVector,
+			FRotator::ZeroRotator,
+			SpawnParameters);
+		if (IsValid(Highlight))
+		{
+			Highlight->SetCellCoverage(1.0f);
+			Highlight->HideHighlight();
+		}
+		return Highlight;
+	};
+
+	if (!IsValid(PrimaryRangeHighlight))
+	{
+		PrimaryRangeHighlight = SpawnRangeHighlight();
+	}
+	if (!IsValid(SecondaryRangeHighlight))
+	{
+		SecondaryRangeHighlight = SpawnRangeHighlight();
 	}
 }
 
@@ -398,6 +515,12 @@ void ALGRPlayerController::UpdatePlacementHighlight()
 		return;
 	}
 
+	if (IsValid(SelectedPlacedBuilding))
+	{
+		GridHighlight->HideHighlight();
+		return;
+	}
+
 	const bool bUseSelectedCell = bHasSelectedGridCell;
 	if (!bUseSelectedCell && !bHasHoveredGridCell)
 	{
@@ -424,4 +547,62 @@ void ALGRPlayerController::UpdatePlacementHighlight()
 	GridHighlight->ShowHighlight(
 		GridManager->GridAreaToWorld(Coordinates, FootprintSize, GridHighlightZOffset),
 		bCanPlace);
+}
+
+void ALGRPlayerController::UpdateSelectedBuildingRanges()
+{
+	if (!IsValid(SelectedPlacedBuilding)
+		|| (!IsValid(GridManager) && !RefreshGridManager()))
+	{
+		HideRangeHighlights();
+		return;
+	}
+
+	EnsureRangeHighlights();
+	if (!IsValid(PrimaryRangeHighlight) || !IsValid(SecondaryRangeHighlight))
+	{
+		return;
+	}
+
+	const float CellSize = GridManager->GetCellSize();
+	const FVector Center = GridManager->GridAreaToWorld(
+		SelectedPlacedBuilding->GetGridOrigin(),
+		SelectedPlacedBuilding->GetFootprintSize(),
+		RangeHighlightZOffset);
+	const FRotator GridRotation = GridManager->GetActorRotation();
+	PrimaryRangeHighlight->SetActorRotation(GridRotation);
+	SecondaryRangeHighlight->SetActorRotation(GridRotation);
+	HideRangeHighlights();
+
+	if (const ALGRArrowTowerBuilding* Tower = Cast<ALGRArrowTowerBuilding>(SelectedPlacedBuilding))
+	{
+		PrimaryRangeHighlight->SetCircleRadius(CellSize, Tower->GetAttackRadiusCells());
+		const int32 NoiseDiameter = Tower->GetNoiseRadius() * 2 + 1;
+		SecondaryRangeHighlight->SetFootprintSize(CellSize, FIntPoint(NoiseDiameter, NoiseDiameter));
+		SecondaryRangeHighlight->ShowHighlight(Center, false);
+		PrimaryRangeHighlight->ShowHighlight(Center + FVector(0.0f, 0.0f, 1.0f), true);
+	}
+	else if (const ALGRGardenBuilding* Garden = Cast<ALGRGardenBuilding>(SelectedPlacedBuilding))
+	{
+		const int32 EffectDiameter = Garden->GetEffectRadius() * 2 + 1;
+		PrimaryRangeHighlight->SetFootprintSize(CellSize, FIntPoint(EffectDiameter, EffectDiameter));
+		PrimaryRangeHighlight->ShowHighlight(Center, true);
+	}
+	else if (const ALGRBlacksmithBuilding* Blacksmith = Cast<ALGRBlacksmithBuilding>(SelectedPlacedBuilding))
+	{
+		PrimaryRangeHighlight->SetCircleRadius(CellSize, Blacksmith->GetEffectRadiusCells());
+		PrimaryRangeHighlight->ShowHighlight(Center, true);
+	}
+}
+
+void ALGRPlayerController::HideRangeHighlights()
+{
+	if (IsValid(PrimaryRangeHighlight))
+	{
+		PrimaryRangeHighlight->HideHighlight();
+	}
+	if (IsValid(SecondaryRangeHighlight))
+	{
+		SecondaryRangeHighlight->HideHighlight();
+	}
 }

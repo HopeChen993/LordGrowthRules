@@ -38,5 +38,5 @@ public:
 	FLGRDailyBuildingSettlementCompletedSignature OnDailyBuildingSettlementCompleted;
 
 private:
-	static int32 GetGridDistance(const FIntPoint& A, const FIntPoint& B);
+	static int32 GetSquareGridDistance(const FIntPoint& A, const FIntPoint& B);
 };

@@ -27,6 +27,13 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
 	int32,
 	AvailablePopulation);
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+	FLGRBuildActionsChangedSignature,
+	int32,
+	RemainingBuildActions,
+	int32,
+	MaxBuildActions);
+
 UCLASS()
 class LORDGROWTHRULES_API ALGRGameModeBase : public AGameModeBase
 {
@@ -71,6 +78,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "LGR|Population")
 	int32 GetAvailablePopulation() const;
 
+	UFUNCTION(BlueprintPure, Category = "LGR|Victory")
+	int32 GetVictoryPopulationTarget() const { return VictoryPopulationTarget; }
+
+	UFUNCTION(BlueprintPure, Category = "LGR|Victory")
+	bool HasReachedVictoryPopulation() const;
+
 	UFUNCTION(BlueprintPure, Category = "LGR|Population")
 	bool CanAffordPopulation(int32 PopulationCost) const;
 
@@ -87,6 +100,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "LGR|Population")
 	void AddPopulation(int32 PopulationAmount);
 
+	UFUNCTION(BlueprintPure, Category = "LGR|Building Actions")
+	int32 GetRemainingBuildActions() const { return RemainingBuildActions; }
+
+	UFUNCTION(BlueprintPure, Category = "LGR|Building Actions")
+	int32 GetMaxBuildActionsThisDay() const { return MaxBuildActionsThisDay; }
+
+	UFUNCTION(BlueprintPure, Category = "LGR|Building Actions")
+	bool HasRemainingBuildActions() const { return RemainingBuildActions > 0; }
+
+	UFUNCTION(BlueprintCallable, Category = "LGR|Building Actions")
+	bool TryConsumeBuildAction();
+
+	void RefundBuildAction();
+
 	UPROPERTY(BlueprintAssignable, Category = "LGR|Game Flow")
 	FLGRGamePhaseChangedSignature OnGamePhaseChanged;
 
@@ -98,6 +125,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "LGR|Population")
 	FLGRPopulationChangedSignature OnPopulationChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "LGR|Building Actions")
+	FLGRBuildActionsChangedSignature OnBuildActionsChanged;
 
 protected:
 	virtual void BeginPlay() override;
@@ -118,7 +148,10 @@ protected:
 	bool bPlayerWon = false;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Population", meta = (ClampMin = "0"))
-	int32 InitialPopulation = 10;
+	int32 InitialPopulation = 20;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Victory", meta = (ClampMin = "1", UIMin = "1"))
+	int32 VictoryPopulationTarget = 50;
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "LGR|Population")
 	int32 TotalPopulation = 0;
@@ -126,7 +159,18 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "LGR|Population")
 	int32 AssignedPopulation = 0;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Building Actions", meta = (ClampMin = "1"))
+	int32 PopulationPerBuildAction = 10;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "LGR|Building Actions")
+	int32 MaxBuildActionsThisDay = 0;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "LGR|Building Actions")
+	int32 RemainingBuildActions = 0;
+
 private:
+	void ResetBuildActionsForNewDay();
+	void BroadcastBuildActionsChanged();
 	void SetPhase(ELGRGamePhase NewPhase);
 	void AdvanceToNextDay();
 	void BroadcastPopulationChanged();

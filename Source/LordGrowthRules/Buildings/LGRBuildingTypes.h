@@ -9,7 +9,8 @@ enum class ELGRBuildingType : uint8
 	Residence UMETA(DisplayName = "Residence"),
 	ArrowTower UMETA(DisplayName = "Arrow Tower"),
 	Garden UMETA(DisplayName = "Garden"),
-	LordManor UMETA(DisplayName = "Lord Manor")
+	LordManor UMETA(DisplayName = "Lord Manor"),
+	Blacksmith UMETA(DisplayName = "Blacksmith")
 };
 
 UENUM(BlueprintType)
@@ -23,5 +24,6 @@ enum class ELGRPlacementFailureReason : uint8
 	NotBuildingPhase UMETA(DisplayName = "Not Building Phase"),
 	CellUnavailable UMETA(DisplayName = "Cell Unavailable"),
 	InsufficientPopulation UMETA(DisplayName = "Insufficient Population"),
-	SpawnFailed UMETA(DisplayName = "Spawn Failed")
+	SpawnFailed UMETA(DisplayName = "Spawn Failed"),
+	NoBuildActionsRemaining UMETA(DisplayName = "No Build Actions Remaining")
 };

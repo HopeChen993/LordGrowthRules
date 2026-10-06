@@ -30,6 +30,11 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	bool,
 	bIsSelected);
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
+	FLGRPlacedBuildingSelectionChangedSignature,
+	ALGRBuildingBase*,
+	Building);
+
 UCLASS()
 class LORDGROWTHRULES_API ALGRPlayerController : public APlayerController
 {
@@ -60,6 +65,15 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "LGR|Grid Selection")
 	bool GetSelectedGridCell(FIntPoint& OutGridCoordinates) const;
+
+	UFUNCTION(BlueprintCallable, Category = "LGR|Building Selection")
+	bool SelectPlacedBuilding(ALGRBuildingBase* Building);
+
+	UFUNCTION(BlueprintCallable, Category = "LGR|Building Selection")
+	void ClearPlacedBuildingSelection();
+
+	UFUNCTION(BlueprintPure, Category = "LGR|Building Selection")
+	ALGRBuildingBase* GetSelectedPlacedBuilding() const { return SelectedPlacedBuilding; }
 
 	UFUNCTION(BlueprintCallable, Category = "LGR|Building Placement")
 	void SelectBuildingClass(TSubclassOf<ALGRBuildingBase> BuildingClass);
@@ -97,6 +111,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "LGR|Building Placement")
 	FLGRBuildingPlacedSignature OnBuildingPlaced;
 
+	UPROPERTY(BlueprintAssignable, Category = "LGR|Building Selection")
+	FLGRPlacedBuildingSelectionChangedSignature OnPlacedBuildingSelectionChanged;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -113,11 +130,23 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Grid")
 	float GridHighlightZOffset = 12.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Building Selection")
+	float RangeHighlightZOffset = 18.0f;
+
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "LGR|Grid")
 	TObjectPtr<ALGRGridManager> GridManager;
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "LGR|Grid")
 	TObjectPtr<ALGRGridHighlight> GridHighlight;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "LGR|Building Selection")
+	TObjectPtr<ALGRGridHighlight> PrimaryRangeHighlight;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "LGR|Building Selection")
+	TObjectPtr<ALGRGridHighlight> SecondaryRangeHighlight;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "LGR|Building Selection")
+	TObjectPtr<ALGRBuildingBase> SelectedPlacedBuilding;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Building Placement")
 	TSubclassOf<ALGRBuildingBase> DefaultBuildingClass;
@@ -127,9 +156,12 @@ protected:
 
 private:
 	void EnsureGridHighlight();
+	void EnsureRangeHighlights();
 	void UpdateGridHover();
 	void ClearGridHover();
 	void UpdatePlacementHighlight();
+	void UpdateSelectedBuildingRanges();
+	void HideRangeHighlights();
 	ELGRPlacementFailureReason GetPlacementFailureReasonAt(const FIntPoint& GridCoordinates) const;
 	FText GetPlacementFailureText(ELGRPlacementFailureReason FailureReason) const;
 	bool TryPlaceBuildingAt(const FIntPoint& GridCoordinates, bool bClearSelectionOnSuccess);
