@@ -148,7 +148,11 @@ protected:
 	bool bPlayerWon = false;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Population", meta = (ClampMin = "0"))
-	int32 InitialPopulation = 20;
+	int32 InitialPopulation = 50;
+
+	// Population already committed to starting buildings, currently the Lord Manor.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Population", meta = (ClampMin = "0"))
+	int32 InitialAssignedPopulation = 20;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LGR|Victory", meta = (ClampMin = "1", UIMin = "1"))
 	int32 VictoryPopulationTarget = 50;

@@ -16,7 +16,7 @@ void ALGRGameModeBase::BeginPlay()
 	CurrentDay = FMath::Max(1, CurrentDay);
 	CurrentPhase = ELGRGamePhase::Building;
 	TotalPopulation = FMath::Max(0, InitialPopulation);
-	AssignedPopulation = 0;
+	AssignedPopulation = FMath::Clamp(InitialAssignedPopulation, 0, TotalPopulation);
 	ResetBuildActionsForNewDay();
 	OnDayChanged.Broadcast(CurrentDay);
 	OnGamePhaseChanged.Broadcast(CurrentPhase, CurrentPhase);
